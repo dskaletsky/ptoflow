@@ -89,7 +89,7 @@ export async function PATCH(
           remainingNote = `\n*Days remaining in your ${leaveRequest.category.name} bank:* ${remaining}`;
         }
       }
-      slack.chat.postMessage({
+      await slack.chat.postMessage({
         channel: employee.slackUserId,
         text: `🎉 Your PTO request has been approved!`,
         blocks: [{
@@ -102,7 +102,7 @@ export async function PATCH(
       }).catch(console.error);
     }
 
-    // Sync to Google Calendar (fire-and-forget)
+    // Sync to Google Calendar (fire-and-forget — non-critical, can complete after response)
     syncApprovedRequestToCalendars(id).catch(console.error);
 
     return NextResponse.json(updated);
@@ -127,7 +127,7 @@ export async function PATCH(
     if (employee?.slackUserId) {
       const days = `${leaveRequest.workingDaysCount} working day${leaveRequest.workingDaysCount !== 1 ? "s" : ""}`;
       const reasonNote = rejectionReason ? `\n*Reason:* ${rejectionReason}` : "";
-      slack.chat.postMessage({
+      await slack.chat.postMessage({
         channel: employee.slackUserId,
         text: "❌ Your PTO request has been denied",
         blocks: [{
