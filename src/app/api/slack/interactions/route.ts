@@ -45,7 +45,7 @@ async function handleBlockActions(payload: SlackBlockActionsPayload) {
   const managerSlackId = payload.user?.id ?? "";
 
   if (action.action_id === "approve_request") {
-    await approveRequest({ requestId, managerSlackId, channelId, messageTs });
+    await approveRequest({ requestId, managerSlackId, channelId, messageTs }).catch(console.error);
     return new NextResponse(null, { status: 200 });
   }
 
@@ -53,7 +53,7 @@ async function handleBlockActions(payload: SlackBlockActionsPayload) {
     await slack.views.open({
       trigger_id: triggerId,
       view: buildDenialReasonModal(requestId),
-    });
+    }).catch(console.error);
     return new NextResponse(null, { status: 200 });
   }
 
@@ -204,9 +204,12 @@ async function handlePtoRequestSubmit(payload: SlackViewSubmissionPayload) {
     (o: { value: string }) => o.value === "ooo"
   );
 
-  // Respond immediately to close the modal — all DB work happens async
-  // and the user gets a DM with the result
-  processRequestSubmission({ slackUserId, categoryId, startDate, endDate, description, markAsOOO: oooChecked }).catch(console.error);
+  // Await core processing (DB + Slack DMs) before responding.
+  // Vercel terminates the function when the response is sent, so fire-and-forget
+  // doesn't work — we must complete all work before returning.
+  // Calendar sync is fire-and-forget inside processRequestSubmission since it's
+  // non-critical and we can't wait for it within Slack's 3s window.
+  await processRequestSubmission({ slackUserId, categoryId, startDate, endDate, description, markAsOOO: oooChecked }).catch(console.error);
 
   return new NextResponse(null, { status: 200 });
 }
