@@ -1,0 +1,215 @@
+// PTOFlow - Full Data Model
+// NextAuth.js v4 required models + PTOFlow domain models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// NextAuth.js required models
+// ─────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────
+// PTOFlow domain models
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TEAM_MEMBER
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  teams          Team[]
+  leaveCategories LeaveCategory[]
+  companyHolidays CompanyHoliday[]
+
+  // Configuration
+  prorateNewEmployees Boolean @default(true)
+
+  // Google Calendar integration
+  googleCalendarId    String?   // All Company PTO calendar ID
+  googleCalendarName  String?   // All Company PTO calendar display name
+  googleAdminEmail    String?   // Google Workspace admin email to impersonate via domain-wide delegation
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  role           UserRole  @default(TEAM_MEMBER)
+  startDate      DateTime?
+  organizationId String?
+  managerId      String?
+  slackUserId    String?   @unique
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  teams        Team[]        @relation("TeamMembers")
+  manager      User?         @relation("ManagerReports", fields: [managerId], references: [id])
+  reports      User[]        @relation("ManagerReports")
+  managedTeams Team[]        @relation("TeamManager")
+
+  accounts      Account[]
+  sessions      Session[]
+  leaveBanks    LeaveBank[]
+  leaveRequests LeaveRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id             String @id @default(cuid())
+  name           String
+  organizationId String
+  managerId      String?
+  googleCalendarId        String?    // This team's PTO calendar ID
+  googleCalendarName      String?    // Display name of the calendar
+  googleCalendarCreatedAt DateTime?  // When the calendar was created in PTOFlow
+  googleCalendarOwner     String?    // Email of the admin who created it
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  manager      User?        @relation("TeamManager", fields: [managerId], references: [id])
+  members      User[]       @relation("TeamMembers")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, organizationId])
+}
+
+model LeaveCategory {
+  id             String  @id @default(cuid())
+  name           String
+  emoji          String  @default("📅")
+  organizationId String
+  isUnlimited    Boolean @default(false)
+  defaultDays    Int?    // null means unlimited
+  minimumDays    Int?    // for unlimited categories with a minimum requirement
+  requiresApproval Boolean @default(true)
+  isActive       Boolean @default(true)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  leaveBanks    LeaveBank[]
+  leaveRequests LeaveRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, organizationId])
+}
+
+model LeaveBank {
+  id              String @id @default(cuid())
+  userId          String
+  categoryId      String
+  year            Int
+  allocatedDays   Float  // prorated allocation for this employee/year
+  usedDays        Float  @default(0)
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category LeaveCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId, year])
+}
+
+model LeaveRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  categoryId      String
+  startDate       DateTime
+  endDate         DateTime
+  workingDaysCount Float             // calculated at time of request
+  status          LeaveRequestStatus @default(PENDING)
+  description     String?
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  markAsOOO       Boolean            @default(true)  // Whether to create an OOO event in Google Calendar
+
+  // Google Calendar event IDs (stored for deletion on cancel)
+  googleOOOEventId         String?   // OOO event on employee's personal calendar
+  teamCalendarEventIds     Json?     // Map of { [teamId]: eventId } for all team calendars
+  googleOrgCalendarEventId String?   // Event on All Company PTO calendar
+
+  user     User          @relation(fields: [userId], references: [id])
+  category LeaveCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CompanyHoliday {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  date           DateTime
+  recurring      Boolean  @default(true) // repeats annually
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, date])
+}
