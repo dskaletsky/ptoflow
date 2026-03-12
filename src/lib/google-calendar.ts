@@ -271,6 +271,7 @@ export async function syncApprovedRequestToCalendars(requestId: string): Promise
             email: true,
             organizationId: true,
             teams: { select: { id: true, googleCalendarId: true } },
+            managedTeams: { select: { id: true, googleCalendarId: true } },
           },
         },
         category: { select: { emoji: true, name: true } },
@@ -298,16 +299,18 @@ export async function syncApprovedRequestToCalendars(requestId: string): Promise
     const existingTeamEventIds = (req.teamCalendarEventIds as Record<string, string> | null) ?? {};
     const newTeamEventIds: Record<string, string> = { ...existingTeamEventIds };
 
-    console.log(`[GoogleCalendar] User teams: ${JSON.stringify(req.user.teams)}`);
-    console.log(`[GoogleCalendar] org.googleAdminEmail: ${org?.googleAdminEmail}`);
-
     if (org?.googleAdminEmail) {
-      const teamsWithCalendar = req.user.teams.filter(t => t.googleCalendarId && !existingTeamEventIds[t.id]);
-      console.log(`[GoogleCalendar] Teams with calendar (after filter): ${JSON.stringify(teamsWithCalendar)}`);
+      // Combine member teams + managed teams, deduplicating by ID
+      const allTeamsMap = new Map<string, { id: string; googleCalendarId: string | null }>();
+      for (const t of req.user.teams) allTeamsMap.set(t.id, t);
+      for (const t of req.user.managedTeams) allTeamsMap.set(t.id, t);
+
+      const teamsWithCalendar = [...allTeamsMap.values()].filter(
+        t => t.googleCalendarId && !existingTeamEventIds[t.id]
+      );
       await Promise.all(
         teamsWithCalendar.map(async team => {
           const eventId = await addPTOEventToCalendar(org.googleAdminEmail!, team.googleCalendarId!, req, req.user, req.category);
-          console.log(`[GoogleCalendar] Team ${team.id} event result: ${eventId}`);
           if (eventId) newTeamEventIds[team.id] = eventId;
         })
       );
