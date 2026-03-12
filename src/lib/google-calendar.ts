@@ -298,11 +298,16 @@ export async function syncApprovedRequestToCalendars(requestId: string): Promise
     const existingTeamEventIds = (req.teamCalendarEventIds as Record<string, string> | null) ?? {};
     const newTeamEventIds: Record<string, string> = { ...existingTeamEventIds };
 
+    console.log(`[GoogleCalendar] User teams: ${JSON.stringify(req.user.teams)}`);
+    console.log(`[GoogleCalendar] org.googleAdminEmail: ${org?.googleAdminEmail}`);
+
     if (org?.googleAdminEmail) {
       const teamsWithCalendar = req.user.teams.filter(t => t.googleCalendarId && !existingTeamEventIds[t.id]);
+      console.log(`[GoogleCalendar] Teams with calendar (after filter): ${JSON.stringify(teamsWithCalendar)}`);
       await Promise.all(
         teamsWithCalendar.map(async team => {
           const eventId = await addPTOEventToCalendar(org.googleAdminEmail!, team.googleCalendarId!, req, req.user, req.category);
+          console.log(`[GoogleCalendar] Team ${team.id} event result: ${eventId}`);
           if (eventId) newTeamEventIds[team.id] = eventId;
         })
       );
