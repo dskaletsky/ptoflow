@@ -143,9 +143,10 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Sync to Google Calendar if auto-approved (fire-and-forget)
+  // Sync to Google Calendar if auto-approved — must await before returning
+  // (Vercel terminates the function as soon as the response is sent)
   if (status === "APPROVED") {
-    syncApprovedRequestToCalendars(leaveRequest.id).catch(console.error);
+    await syncApprovedRequestToCalendars(leaveRequest.id);
   }
 
   return NextResponse.json(leaveRequest, { status: 201 });

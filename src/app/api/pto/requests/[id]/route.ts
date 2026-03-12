@@ -102,8 +102,9 @@ export async function PATCH(
       }).catch(console.error);
     }
 
-    // Sync to Google Calendar (fire-and-forget — non-critical, can complete after response)
-    syncApprovedRequestToCalendars(id).catch(console.error);
+    // Sync to Google Calendar — must await before returning
+    // (Vercel terminates the function as soon as the response is sent)
+    await syncApprovedRequestToCalendars(id);
 
     return NextResponse.json(updated);
   } else {
