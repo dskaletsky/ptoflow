@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, email, role, startDate, managerId } = body;
+  const { name, email, title, role, startDate, managerId, teamIds } = body;
 
   if (!name || !email) {
     return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       where: { email },
       data: {
         name,
+        title: title ?? null,
         organizationId: session.user.organizationId,
         role: role ?? UserRole.TEAM_MEMBER,
         startDate: startDate ? new Date(startDate) : null,
@@ -62,10 +63,14 @@ export async function POST(req: NextRequest) {
     data: {
       name,
       email,
+      title: title ?? null,
       organizationId: session.user.organizationId,
       role: role ?? UserRole.TEAM_MEMBER,
       startDate: startDate ? new Date(startDate) : null,
       managerId: managerId || null,
+      ...(teamIds?.length ? {
+        teams: { connect: teamIds.map((id: string) => ({ id })) },
+      } : {}),
     },
   });
 

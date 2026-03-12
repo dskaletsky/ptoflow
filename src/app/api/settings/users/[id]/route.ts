@@ -19,7 +19,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, role, startDate, managerId, addTeamIds, removeTeamIds } = body;
+  const { name, title, role, startDate, managerId, addTeamIds, removeTeamIds } = body;
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user || user.organizationId !== session.user.organizationId) {
@@ -30,6 +30,7 @@ export async function PATCH(
     where: { id },
     data: {
       name: name ?? user.name,
+      title: title !== undefined ? (title || null) : user.title,
       role: role ?? user.role,
       startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : user.startDate,
       managerId: managerId !== undefined ? (managerId || null) : user.managerId,

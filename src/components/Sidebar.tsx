@@ -17,10 +17,11 @@ interface SidebarProps {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "🏠" },
   { href: "/my-pto", label: "My PTO", icon: "📅" },
-  { href: "/team", label: "Team", icon: "👥" },
+  { href: "/team", label: "Team PTO", icon: "👥" },
 ];
 
 const adminItems = [
+  { href: "/my-team", label: "Employees", icon: "👤" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 

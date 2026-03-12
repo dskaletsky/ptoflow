@@ -18,6 +18,7 @@ interface User {
   name: string | null;
   email: string | null;
   role: "ADMIN" | "MANAGER" | "TEAM_MEMBER";
+  title: string | null;
   startDate: string | null;
   image: string | null;
   teams: { id: string; name: string }[];
@@ -82,12 +83,10 @@ function formatDate(dateStr: string) {
 
 export function SettingsClient({ org: initialOrg, users: initialUsers, categories: initialCategories, holidays: initialHolidays, teams: initialTeams, currentUserId }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"team" | "teams" | "categories" | "holidays" | "organization" | "calendars">("team");
+  const [tab, setTab] = useState<"teams" | "categories" | "holidays" | "organization" | "calendars">("teams");
 
   // Team state
   const [users, setUsers] = useState(initialUsers);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Category state
   const [categories, setCategories] = useState(initialCategories);
@@ -105,15 +104,6 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
   const [savingOrg, setSavingOrg] = useState(false);
   const [orgSaved, setOrgSaved] = useState(false);
 
-  // User form state
-  const [uName, setUName] = useState("");
-  const [uEmail, setUEmail] = useState("");
-  const [uRole, setURole] = useState<"ADMIN" | "MANAGER" | "TEAM_MEMBER">("TEAM_MEMBER");
-  const [uStartDate, setUStartDate] = useState("");
-  const [uManagerId, setUManagerId] = useState("");
-  const [uError, setUError] = useState("");
-  const [uSaving, setUSaving] = useState(false);
-
   // Category form state
   const [cName, setCName] = useState("");
   const [cEmoji, setCEmoji] = useState("📅");
@@ -127,6 +117,8 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
   // Holiday form state
   const [hName, setHName] = useState("");
   const [hDate, setHDate] = useState("");
+  const [hMonth, setHMonth] = useState("");
+  const [hDay, setHDay] = useState("");
   const [hRecurring, setHRecurring] = useState(true);
   const [hError, setHError] = useState("");
   const [hSaving, setHSaving] = useState(false);
@@ -175,16 +167,6 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
     )
   );
 
-  function openEditUser(user: User) {
-    setUName(user.name ?? "");
-    setUEmail(user.email ?? "");
-    setURole(user.role);
-    setUStartDate(user.startDate ? user.startDate.split("T")[0] : "");
-    setUManagerId(user.manager?.id ?? "");
-    setUError("");
-    setEditingUser(user);
-  }
-
   function openEditCategory(cat: Category) {
     setCName(cat.name);
     setCEmoji(cat.emoji);
@@ -196,60 +178,9 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
     setEditingCategory(cat);
   }
 
-  function resetUserForm() {
-    setUName(""); setUEmail(""); setURole("TEAM_MEMBER");
-    setUStartDate(""); setUManagerId(""); setUError("");
-  }
-
   function resetCategoryForm() {
     setCName(""); setCEmoji("📅"); setCUnlimited(true);
     setCDays(""); setCMinDays(""); setCApproval(true); setCError("");
-  }
-
-  async function handleAddUser(e: React.FormEvent) {
-    e.preventDefault();
-    setUError(""); setUSaving(true);
-    try {
-      const res = await fetch("/api/settings/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: uName, email: uEmail, role: uRole, startDate: uStartDate || null, managerId: uManagerId || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setUError(data.error ?? "Failed to add user"); return; }
-      setUsers([...users, { ...data, teams: [], manager: users.find(u => u.id === uManagerId) ? { id: uManagerId, name: users.find(u => u.id === uManagerId)!.name ?? "" } : null }].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")));
-      setShowAddUser(false);
-      resetUserForm();
-      router.refresh();
-    } finally { setUSaving(false); }
-  }
-
-  async function handleEditUser(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingUser) return;
-    setUError(""); setUSaving(true);
-    try {
-      const res = await fetch(`/api/settings/users/${editingUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: uName, role: uRole, startDate: uStartDate || null, managerId: uManagerId || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setUError(data.error ?? "Failed to update user"); return; }
-      setUsers(users.map(u => u.id === editingUser.id ? data : u));
-      setEditingUser(null);
-      resetUserForm();
-      router.refresh();
-    } finally { setUSaving(false); }
-  }
-
-  async function handleRemoveUser(id: string) {
-    if (!confirm("Remove this employee from your organization?")) return;
-    const res = await fetch(`/api/settings/users/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setUsers(users.filter(u => u.id !== id));
-      router.refresh();
-    }
   }
 
   async function handleAddCategory(e: React.FormEvent) {
@@ -305,13 +236,17 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
       const res = await fetch("/api/settings/holidays", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: hName, date: hDate, recurring: hRecurring }),
+        body: JSON.stringify({
+          name: hName,
+          date: hRecurring ? `2000-${hMonth}-${hDay.padStart(2, "0")}` : hDate,
+          recurring: hRecurring,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setHError(data.error ?? "Failed to add holiday"); return; }
       setHolidays([...holidays, data].sort((a, b) => a.date.localeCompare(b.date)));
       setShowAddHoliday(false);
-      setHName(""); setHDate(""); setHRecurring(true);
+      setHName(""); setHDate(""); setHMonth(""); setHDay(""); setHRecurring(true);
       router.refresh();
     } finally { setHSaving(false); }
   }
@@ -415,7 +350,6 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
   const managersAndAdmins = users.filter(u => u.role === "ADMIN" || u.role === "MANAGER");
 
   const tabs = [
-    { key: "team", label: "Employees", count: users.length },
     { key: "teams", label: "Teams", count: teams.length },
     { key: "categories", label: "Leave Categories", count: categories.filter(c => c.isActive).length },
     { key: "holidays", label: "Holidays", count: holidays.length },
@@ -447,78 +381,6 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
           </button>
         ))}
       </div>
-
-      {/* ── TEAM TAB ── */}
-      {tab === "team" && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-800">Employees</h2>
-            <button
-              onClick={() => { resetUserForm(); setShowAddUser(true); }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              + Add employee
-            </button>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Name</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Email</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Role</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Team(s)</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Manager</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Start date</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => (
-                  <tr key={user.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        {user.image ? (
-                          <img src={user.image} className="w-7 h-7 rounded-full" alt="" />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
-                            {user.name?.[0] ?? "?"}
-                          </div>
-                        )}
-                        <span className="font-medium text-gray-800">{user.name}</span>
-                        {user.id === currentUserId && (
-                          <span className="text-xs text-gray-400">(you)</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">{user.email}</td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${roleBadge[user.role]}`}>
-                        {roleLabels[user.role]}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">
-                      {user.teams.length > 0 ? user.teams.map(t => t.name).join(", ") : "—"}
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">{user.manager?.name ?? "—"}</td>
-                    <td className="px-5 py-3 text-gray-500">
-                      {user.startDate ? formatDate(user.startDate) : "—"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3 justify-end">
-                        <button onClick={() => openEditUser(user)} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Edit</button>
-                        {user.id !== currentUserId && (
-                          <button onClick={() => handleRemoveUser(user.id)} className="text-xs text-gray-400 hover:text-red-600 transition-colors">Remove</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* ── TEAMS TAB ── */}
       {tab === "teams" && (
@@ -662,7 +524,11 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
                 {holidays.map(h => (
                   <tr key={h.id} className="border-b border-gray-50 last:border-0">
                     <td className="px-5 py-3 font-medium text-gray-800">{h.name}</td>
-                    <td className="px-5 py-3 text-gray-600">{formatDate(h.date)}</td>
+                    <td className="px-5 py-3 text-gray-600">
+                      {h.recurring
+                        ? new Date(h.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })
+                        : formatDate(h.date)}
+                    </td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${h.recurring ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
                         {h.recurring ? "Annual" : "One-time"}
@@ -1069,68 +935,6 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
         </div>
       )}
 
-      {/* ── USER MODAL (add/edit) ── */}
-      {(showAddUser || editingUser) && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">{editingUser ? "Edit employee" : "Add employee"}</h2>
-            </div>
-            <form onSubmit={editingUser ? handleEditUser : handleAddUser} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input type="text" value={uName} onChange={e => setUName(e.target.value)} required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" value={uEmail} onChange={e => setUEmail(e.target.value)} required
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select value={uRole} onChange={e => setURole(e.target.value as "ADMIN" | "MANAGER" | "TEAM_MEMBER")}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="TEAM_MEMBER">Team Member</option>
-                    <option value="MANAGER">Manager</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
-                  <input type="date" value={uStartDate} onChange={e => setUStartDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Manager <span className="text-gray-400 font-normal">(optional)</span></label>
-                <select value={uManagerId} onChange={e => setUManagerId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">No manager</option>
-                  {users.filter(u => u.role === "ADMIN" || u.role === "MANAGER").map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </div>
-              {uError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{uError}</p>}
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => { setShowAddUser(false); setEditingUser(null); resetUserForm(); }}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
-                  Cancel
-                </button>
-                <button type="submit" disabled={uSaving}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60">
-                  {uSaving ? "Saving..." : editingUser ? "Save changes" : "Add employee"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ── CATEGORY MODAL (add/edit) ── */}
       {(showAddCategory || editingCategory) && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -1301,21 +1105,43 @@ export function SettingsClient({ org: initialOrg, users: initialUsers, categorie
                   placeholder="e.g. New Year's Day"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" value={hDate} onChange={e => setHDate(e.target.value)} required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
               <div className="flex items-center justify-between py-1">
                 <p className="text-sm font-medium text-gray-800">Repeats annually</p>
-                <button type="button" onClick={() => setHRecurring(!hRecurring)}
+                <button type="button" onClick={() => { setHRecurring(!hRecurring); setHDate(""); setHMonth(""); setHDay(""); }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${hRecurring ? "bg-blue-600" : "bg-gray-200"}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${hRecurring ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
+              {hRecurring ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={hMonth} onChange={e => setHMonth(e.target.value)} required
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Month</option>
+                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                        <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>
+                      ))}
+                    </select>
+                    <select value={hDay} onChange={e => setHDay(e.target.value)} required
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                        <option key={d} value={String(d)}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input type="date" value={hDate} onChange={e => setHDate(e.target.value)} required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              )}
               {hError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{hError}</p>}
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => { setShowAddHoliday(false); setHName(""); setHDate(""); setHError(""); }}
+                <button type="button" onClick={() => { setShowAddHoliday(false); setHName(""); setHDate(""); setHMonth(""); setHDay(""); setHError(""); }}
                   className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                   Cancel
                 </button>

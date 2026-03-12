@@ -96,6 +96,7 @@ model User {
   emailVerified  DateTime?
   image          String?
   role           UserRole  @default(TEAM_MEMBER)
+  title          String?
   startDate      DateTime?
   organizationId String?
   managerId      String?
