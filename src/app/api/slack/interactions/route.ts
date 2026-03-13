@@ -278,11 +278,17 @@ async function processRequestSubmission({
   });
 
   if (overlapping) {
-    const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
-    const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
-      ? fmt(overlapping.startDate)
-      : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
-    return dmError(`${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.`);
+    const overlapStart = overlapping.startDate > start ? overlapping.startDate : start;
+    const overlapEnd = overlapping.endDate < end ? overlapping.endDate : end;
+    const sharedWorkingDays = countWorkingDays(overlapStart, overlapEnd, holidays.map((h) => h.date));
+
+    if (sharedWorkingDays > 0) {
+      const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
+      const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
+        ? fmt(overlapping.startDate)
+        : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
+      return dmError(`${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.`);
+    }
   }
 
   const workingDaysCount = countWorkingDays(start, end, holidays.map((h) => h.date));
