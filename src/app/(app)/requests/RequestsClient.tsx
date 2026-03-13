@@ -41,9 +41,10 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function RequestsClient({ pendingRequests: initialRequests, previousRequests }: Props) {
+export function RequestsClient({ pendingRequests: initialRequests, previousRequests: initialHistory }: Props) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
+  const [history, setHistory] = useState(initialHistory);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
@@ -54,7 +55,9 @@ export function RequestsClient({ pendingRequests: initialRequests, previousReque
       body: JSON.stringify({ action: "approve" }),
     });
     if (res.ok) {
+      const approved = requests.find((r) => r.id === id);
       setRequests(requests.filter((r) => r.id !== id));
+      if (approved) setHistory([{ ...approved, status: "APPROVED", rejectionReason: null }, ...history]);
       router.refresh();
     }
   }
@@ -66,7 +69,9 @@ export function RequestsClient({ pendingRequests: initialRequests, previousReque
       body: JSON.stringify({ action: "reject", rejectionReason }),
     });
     if (res.ok) {
+      const rejected = requests.find((r) => r.id === id);
       setRequests(requests.filter((r) => r.id !== id));
+      if (rejected) setHistory([{ ...rejected, status: "REJECTED", rejectionReason }, ...history]);
       setRejectingId(null);
       setRejectionReason("");
       router.refresh();
@@ -159,7 +164,7 @@ export function RequestsClient({ pendingRequests: initialRequests, previousReque
       <div className="mt-10">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Previous Requests</h2>
         <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          {previousRequests.length === 0 ? (
+          {history.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400 text-sm">No request history yet.</p>
             </div>
@@ -176,7 +181,7 @@ export function RequestsClient({ pendingRequests: initialRequests, previousReque
                 </tr>
               </thead>
               <tbody>
-                {previousRequests.map((req) => (
+                {history.map((req) => (
                   <tr key={req.id} className="border-b border-gray-50 last:border-0">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
