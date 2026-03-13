@@ -20,13 +20,15 @@ export default async function AppLayout({
     session.user.role === UserRole.ADMIN ||
     session.user.role === UserRole.MANAGER;
 
+  const isAdmin = session.user.role === UserRole.ADMIN;
+  const pendingUserFilter = isAdmin
+    ? { organizationId: session.user.organizationId }
+    : { organizationId: session.user.organizationId, managerId: session.user.id };
+
   const pendingCount =
     isManagerOrAdmin && session.user.organizationId
       ? await prisma.leaveRequest.count({
-          where: {
-            status: "PENDING",
-            user: { organizationId: session.user.organizationId },
-          },
+          where: { status: "PENDING", user: pendingUserFilter },
         })
       : 0;
 
