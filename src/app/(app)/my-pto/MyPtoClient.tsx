@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PtoCalendar } from "@/components/PtoCalendar";
 
 interface Category {
   id: string;
@@ -32,18 +33,19 @@ interface LeaveRequest {
   category: Category;
 }
 
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  recurring: boolean;
+}
+
 interface Props {
   categories: Category[];
   banks: Bank[];
   myRequests: LeaveRequest[];
+  holidays: Holiday[];
 }
-
-const statusStyles: Record<string, string> = {
-  PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200",
-  APPROVED: "bg-green-50 text-green-700 border border-green-200",
-  REJECTED: "bg-red-50 text-red-700 border border-red-200",
-  CANCELLED: "bg-gray-100 text-gray-500 border border-gray-200",
-};
 
 function isWeekendOnly(start: string, end: string): boolean {
   if (!start || !end) return false;
@@ -58,16 +60,8 @@ function isWeekendOnly(start: string, end: string): boolean {
   return true;
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
-export function MyPtoClient({ categories, banks, myRequests: initialRequests }: Props) {
+export function MyPtoClient({ categories, banks, myRequests: initialRequests, holidays }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [myRequests, setMyRequests] = useState(initialRequests);
@@ -116,14 +110,6 @@ export function MyPtoClient({ categories, banks, myRequests: initialRequests }: 
     }
   }
 
-  async function handleCancel(id: string) {
-    const res = await fetch(`/api/pto/requests/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setMyRequests(myRequests.map((r) => r.id === id ? { ...r, status: "CANCELLED" } : r));
-      router.refresh();
-    }
-  }
-
   return (
     <div className="p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -160,66 +146,30 @@ export function MyPtoClient({ categories, banks, myRequests: initialRequests }: 
         </div>
       )}
 
-      {/* My requests list */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {myRequests.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-sm">No requests yet.</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="text-blue-600 text-sm font-medium mt-1 hover:text-blue-700"
-            >
-              Submit your first request →
-            </button>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 font-medium text-gray-500">Type</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">Dates</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">Days</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {myRequests.map((req) => (
-                <tr key={req.id} className="border-b border-gray-50 last:border-0">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span>{req.category.emoji}</span>
-                      <span className="font-medium text-gray-800">{req.category.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-gray-600">
-                    {formatDate(req.startDate)} – {formatDate(req.endDate)}
-                  </td>
-                  <td className="px-5 py-3 text-gray-600">{req.workingDaysCount}d</td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[req.status]}`}>
-                      {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
-                    </span>
-                    {req.status === "REJECTED" && req.rejectionReason && (
-                      <p className="text-xs text-gray-400 mt-0.5">{req.rejectionReason}</p>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    {(req.status === "PENDING" || req.status === "APPROVED") && (
-                      <button
-                        onClick={() => handleCancel(req.id)}
-                        className="text-xs text-gray-400 hover:text-red-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Calendar / list view */}
+      {myRequests.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 text-center py-12">
+          <p className="text-gray-400 text-sm">No requests yet.</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="text-blue-600 text-sm font-medium mt-1 hover:text-blue-700"
+          >
+            Submit your first request →
+          </button>
+        </div>
+      ) : (
+        <PtoCalendar
+          requests={myRequests}
+          holidays={holidays}
+          onCancel={async (id) => {
+            const res = await fetch(`/api/pto/requests/${id}`, { method: "DELETE" });
+            if (res.ok) {
+              setMyRequests(myRequests.map((r) => r.id === id ? { ...r, status: "CANCELLED" } : r));
+              router.refresh();
+            }
+          }}
+        />
+      )}
 
       {/* Request form modal */}
       {showForm && (

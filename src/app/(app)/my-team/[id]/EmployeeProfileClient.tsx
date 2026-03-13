@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PtoCalendar } from "@/components/PtoCalendar";
 
 interface Employee {
   id: string;
@@ -44,6 +45,13 @@ interface LeaveRequest {
   category: Category;
 }
 
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  recurring: boolean;
+}
+
 interface Props {
   employee: Employee;
   categories: Category[];
@@ -52,6 +60,7 @@ interface Props {
   historyRequests: LeaveRequest[];
   allTeams: { id: string; name: string }[];
   managers: { id: string; name: string }[];
+  holidays: Holiday[];
   isAdmin: boolean;
 }
 
@@ -101,6 +110,7 @@ export function EmployeeProfileClient({
   historyRequests: initialHistory,
   allTeams,
   managers,
+  holidays,
   isAdmin,
 }: Props) {
   const router = useRouter();
@@ -215,11 +225,11 @@ export function EmployeeProfileClient({
     }
   }
 
-  async function handleReject(id: string) {
+  async function handleRejectWithReason(id: string, reason: string) {
     const res = await fetch(`/api/pto/requests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reject", rejectionReason }),
+      body: JSON.stringify({ action: "reject", rejectionReason: reason }),
     });
 
     if (res.ok) {
@@ -227,12 +237,21 @@ export function EmployeeProfileClient({
       if (rejected) {
         setPendingRequests(pendingRequests.filter((r) => r.id !== id));
         setHistoryRequests([
-          { ...rejected, status: "REJECTED", rejectionReason },
+          { ...rejected, status: "REJECTED", rejectionReason: reason },
           ...historyRequests,
         ]);
       }
       setRejectingId(null);
       setRejectionReason("");
+      router.refresh();
+    }
+  }
+
+  async function handleCancel(id: string) {
+    const res = await fetch(`/api/pto/requests/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setPendingRequests(pendingRequests.map((r) => r.id === id ? { ...r, status: "CANCELLED" } : r));
+      setHistoryRequests(historyRequests.map((r) => r.id === id ? { ...r, status: "CANCELLED" } : r));
       router.refresh();
     }
   }
@@ -409,67 +428,13 @@ export function EmployeeProfileClient({
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Request History
         </h2>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {historyRequests.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-sm">No request history yet.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">
-                    Type
-                  </th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">
-                    Dates
-                  </th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">
-                    Days
-                  </th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRequests.map((req) => (
-                  <tr
-                    key={req.id}
-                    className="border-b border-gray-50 last:border-0"
-                  >
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span>{req.category.emoji}</span>
-                        <span className="font-medium text-gray-800">
-                          {req.category.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
-                      {formatDate(req.startDate)} – {formatDate(req.endDate)}
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">
-                      {req.workingDaysCount}d
-                    </td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[req.status]}`}
-                      >
-                        {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
-                      </span>
-                      {req.status === "REJECTED" && req.rejectionReason && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {req.rejectionReason}
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <PtoCalendar
+          requests={[...pendingRequests, ...historyRequests]}
+          holidays={holidays}
+          onApprove={handleApprove}
+          onReject={handleRejectWithReason}
+          onCancel={handleCancel}
+        />
       </section>
 
       {/* Edit modal */}
@@ -639,7 +604,7 @@ export function EmployeeProfileClient({
                 Cancel
               </button>
               <button
-                onClick={() => handleReject(rejectingId)}
+                onClick={() => handleRejectWithReason(rejectingId, rejectionReason)}
                 className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
               >
                 Reject

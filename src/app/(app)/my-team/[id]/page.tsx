@@ -20,7 +20,7 @@ export default async function EmployeeProfilePage({
 
   const year = new Date().getFullYear();
 
-  const [employee, categories, banks, requests, allTeams, managers] =
+  const [employee, categories, banks, requests, allTeams, managers, holidays] =
     await Promise.all([
       prisma.user.findUnique({
         where: { id },
@@ -58,6 +58,10 @@ export default async function EmployeeProfilePage({
             orderBy: { name: "asc" },
           })
         : Promise.resolve([]),
+      prisma.companyHoliday.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, name: true, date: true, recurring: true },
+      }),
     ]);
 
   if (!employee || employee.organizationId !== orgId) {
@@ -81,6 +85,7 @@ export default async function EmployeeProfilePage({
       historyRequests={JSON.parse(JSON.stringify(historyRequests))}
       allTeams={JSON.parse(JSON.stringify(allTeams))}
       managers={JSON.parse(JSON.stringify(managers))}
+      holidays={JSON.parse(JSON.stringify(holidays))}
       isAdmin={isAdmin}
     />
   );

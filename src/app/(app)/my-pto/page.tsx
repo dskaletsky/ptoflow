@@ -12,7 +12,7 @@ export default async function MyPtoPage() {
   const orgId = session.user.organizationId;
   const year = new Date().getFullYear();
 
-  const [categories, banks, myRequests] = await Promise.all([
+  const [categories, banks, myRequests, holidays] = await Promise.all([
     orgId
       ? prisma.leaveCategory.findMany({
           where: { organizationId: orgId, isActive: true },
@@ -28,6 +28,12 @@ export default async function MyPtoPage() {
       include: { category: true },
       orderBy: { createdAt: "desc" },
     }),
+    orgId
+      ? prisma.companyHoliday.findMany({
+          where: { organizationId: orgId },
+          select: { id: true, name: true, date: true, recurring: true },
+        })
+      : [],
   ]);
 
   return (
@@ -35,6 +41,7 @@ export default async function MyPtoPage() {
       categories={JSON.parse(JSON.stringify(categories))}
       banks={JSON.parse(JSON.stringify(banks))}
       myRequests={JSON.parse(JSON.stringify(myRequests))}
+      holidays={JSON.parse(JSON.stringify(holidays))}
     />
   );
 }
