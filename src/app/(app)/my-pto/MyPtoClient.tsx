@@ -45,6 +45,19 @@ const statusStyles: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-500 border border-gray-200",
 };
 
+function isWeekendOnly(start: string, end: string): boolean {
+  if (!start || !end) return false;
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const d = new Date(s);
+  while (d <= e) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) return false;
+    d.setDate(d.getDate() + 1);
+  }
+  return true;
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     timeZone: "UTC",
@@ -73,6 +86,7 @@ export function MyPtoClient({ categories, banks, myRequests: initialRequests }: 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedBank = banks.find((b) => b.categoryId === categoryId);
   const remaining = selectedBank ? selectedBank.allocatedDays - selectedBank.usedDays : null;
+  const weekendOnly = isWeekendOnly(startDate, endDate);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -253,6 +267,12 @@ export function MyPtoClient({ categories, banks, myRequests: initialRequests }: 
                 </div>
               </div>
 
+              {weekendOnly && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  This request is on a weekend which is a non-working day. Please adjust and resubmit.
+                </p>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Note <span className="text-gray-400 font-normal">(optional)</span>
@@ -289,7 +309,7 @@ export function MyPtoClient({ categories, banks, myRequests: initialRequests }: 
                   Cancel
                 </button>
                 <button
-                  type="submit" disabled={submitting}
+                  type="submit" disabled={submitting || weekendOnly}
                   className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
                 >
                   {submitting ? "Submitting..." : "Submit request"}
