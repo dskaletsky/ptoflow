@@ -224,16 +224,16 @@ export function PtoCalendar({ requests, holidays, onApprove, onReject, onCancel 
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           <button
-            onClick={() => setView("calendar")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "calendar" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
-          >
-            📅 Calendar
-          </button>
-          <button
             onClick={() => setView("list")}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
           >
             📋 List
+          </button>
+          <button
+            onClick={() => setView("calendar")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "calendar" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
+          >
+            📅 Calendar
           </button>
         </div>
         <div className="flex items-center gap-2">
