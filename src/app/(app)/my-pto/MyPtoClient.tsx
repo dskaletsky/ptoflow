@@ -30,15 +30,12 @@ interface LeaveRequest {
   description: string | null;
   rejectionReason: string | null;
   category: Category;
-  user?: { id: string; name: string | null; email: string | null; image: string | null };
 }
 
 interface Props {
   categories: Category[];
   banks: Bank[];
   myRequests: LeaveRequest[];
-  pendingRequests: LeaveRequest[];
-  isManagerOrAdmin: boolean;
 }
 
 const statusStyles: Record<string, string> = {
@@ -57,18 +54,10 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function MyPtoClient({
-  categories,
-  banks,
-  myRequests: initialRequests,
-  pendingRequests: initialPending,
-  isManagerOrAdmin,
-}: Props) {
+export function MyPtoClient({ categories, banks, myRequests: initialRequests }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"my-pto" | "approvals">("my-pto");
   const [showForm, setShowForm] = useState(false);
   const [myRequests, setMyRequests] = useState(initialRequests);
-  const [pendingRequests, setPendingRequests] = useState(initialPending);
 
   // Form state
   const [categoryId, setCategoryId] = useState(
@@ -81,36 +70,25 @@ export function MyPtoClient({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Rejection modal state
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedBank = banks.find((b) => b.categoryId === categoryId);
-
-  const remaining = selectedBank
-    ? selectedBank.allocatedDays - selectedBank.usedDays
-    : null;
+  const remaining = selectedBank ? selectedBank.allocatedDays - selectedBank.usedDays : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
     setSubmitting(true);
-
     try {
       const res = await fetch("/api/pto/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId, startDate, endDate, description, markAsOOO }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setFormError(data.error ?? "Something went wrong.");
         return;
       }
-
       setMyRequests([data, ...myRequests]);
       setShowForm(false);
       setCategoryId(categories.find((c) => c.name === "Vacation")?.id ?? categories[0]?.id ?? "");
@@ -121,34 +99,6 @@ export function MyPtoClient({
       router.refresh();
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleApprove(id: string) {
-    const res = await fetch(`/api/pto/requests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve" }),
-    });
-
-    if (res.ok) {
-      setPendingRequests(pendingRequests.filter((r) => r.id !== id));
-      router.refresh();
-    }
-  }
-
-  async function handleReject(id: string) {
-    const res = await fetch(`/api/pto/requests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reject", rejectionReason }),
-    });
-
-    if (res.ok) {
-      setPendingRequests(pendingRequests.filter((r) => r.id !== id));
-      setRejectingId(null);
-      setRejectionReason("");
-      router.refresh();
     }
   }
 
@@ -166,9 +116,7 @@ export function MyPtoClient({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My PTO</h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Manage your time off requests.
-          </p>
+          <p className="text-gray-500 mt-1 text-sm">Manage your time off requests.</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -184,10 +132,7 @@ export function MyPtoClient({
           {banks.map((bank) => {
             const rem = bank.allocatedDays - bank.usedDays;
             return (
-              <div
-                key={bank.id}
-                className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-2"
-              >
+              <div key={bank.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-2">
                 <span>{bank.category.emoji}</span>
                 <div>
                   <p className="text-xs text-gray-500">{bank.category.name}</p>
@@ -201,268 +146,127 @@ export function MyPtoClient({
         </div>
       )}
 
-      {/* Tabs */}
-      {isManagerOrAdmin && (
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-          <button
-            onClick={() => setTab("my-pto")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === "my-pto"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            My Requests
-          </button>
-          <button
-            onClick={() => setTab("approvals")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              tab === "approvals"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Pending Approvals
-            {pendingRequests.length > 0 && (
-              <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {pendingRequests.length}
-              </span>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* My requests list */}
-      {tab === "my-pto" && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {myRequests.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-sm">No requests yet.</p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="text-blue-600 text-sm font-medium mt-1 hover:text-blue-700"
-              >
-                Submit your first request →
-              </button>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Type</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Dates</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Days</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {myRequests.map((req) => (
-                  <tr key={req.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span>{req.category.emoji}</span>
-                        <span className="font-medium text-gray-800">
-                          {req.category.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">
-                      {formatDate(req.startDate)} – {formatDate(req.endDate)}
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">
-                      {req.workingDaysCount}d
-                    </td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
-                          statusStyles[req.status]
-                        }`}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {myRequests.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-sm">No requests yet.</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="text-blue-600 text-sm font-medium mt-1 hover:text-blue-700"
+            >
+              Submit your first request →
+            </button>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Type</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Dates</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Days</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {myRequests.map((req) => (
+                <tr key={req.id} className="border-b border-gray-50 last:border-0">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <span>{req.category.emoji}</span>
+                      <span className="font-medium text-gray-800">{req.category.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-gray-600">
+                    {formatDate(req.startDate)} – {formatDate(req.endDate)}
+                  </td>
+                  <td className="px-5 py-3 text-gray-600">{req.workingDaysCount}d</td>
+                  <td className="px-5 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[req.status]}`}>
+                      {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
+                    </span>
+                    {req.status === "REJECTED" && req.rejectionReason && (
+                      <p className="text-xs text-gray-400 mt-0.5">{req.rejectionReason}</p>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {(req.status === "PENDING" || req.status === "APPROVED") && (
+                      <button
+                        onClick={() => handleCancel(req.id)}
+                        className="text-xs text-gray-400 hover:text-red-600 transition-colors"
                       >
-                        {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
-                      </span>
-                      {req.status === "REJECTED" && req.rejectionReason && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {req.rejectionReason}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {(req.status === "PENDING" || req.status === "APPROVED") && (
-                        <button
-                          onClick={() => handleCancel(req.id)}
-                          className="text-xs text-gray-400 hover:text-red-600 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* Pending approvals list */}
-      {tab === "approvals" && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {pendingRequests.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-sm">
-                No requests waiting for review.
-              </p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Employee</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Type</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Dates</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Days</th>
-                  <th className="text-left px-5 py-3 font-medium text-gray-500">Note</th>
-                  <th className="px-5 py-3" />
+                        Cancel
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {pendingRequests.map((req) => (
-                  <tr key={req.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-3 font-medium text-gray-800">
-                      {req.user?.name ?? "—"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span>{req.category.emoji}</span>
-                        <span className="text-gray-700">{req.category.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">
-                      {formatDate(req.startDate)} – {formatDate(req.endDate)}
-                    </td>
-                    <td className="px-5 py-3 text-gray-600">
-                      {req.workingDaysCount}d
-                    </td>
-                    <td className="px-5 py-3 text-gray-500 max-w-xs truncate">
-                      {req.description ?? "—"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => handleApprove(req.id)}
-                          className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors font-medium"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRejectingId(req.id);
-                            setRejectionReason("");
-                          }}
-                          className="text-xs bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors font-medium"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* Request form modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Request time off
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">Request time off</h2>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type of leave
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type of leave</label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.emoji} {cat.name}
-                    </option>
+                    <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
                   ))}
                 </select>
                 {selectedCategory && !selectedCategory.isUnlimited && remaining !== null && (
                   <p className="text-xs text-gray-500 mt-1">
-                    {remaining} day{remaining !== 1 ? "s" : ""} remaining in your{" "}
-                    {selectedCategory.name} bank.
+                    {remaining} day{remaining !== 1 ? "s" : ""} remaining in your {selectedCategory.name} bank.
                   </p>
                 )}
                 {selectedCategory && !selectedCategory.requiresApproval && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✓ This type is automatically approved.
-                  </p>
+                  <p className="text-xs text-green-600 mt-1">✓ This type is automatically approved.</p>
                 )}
               </div>
 
-              {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start date
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
                   <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
+                    type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End date
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End date</label>
                   <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                    min={startDate}
+                    type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required min={startDate}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Note{" "}
-                  <span className="text-gray-400 font-normal">(optional)</span>
+                  Note <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
+                  value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
                   placeholder="Add any context for your manager..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
 
-              {/* OOO checkbox */}
               <label className="flex items-start gap-3 cursor-pointer py-1">
                 <input
-                  type="checkbox"
-                  checked={markAsOOO}
-                  onChange={(e) => setMarkAsOOO(e.target.checked)}
+                  type="checkbox" checked={markAsOOO} onChange={(e) => setMarkAsOOO(e.target.checked)}
                   className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">
@@ -474,67 +278,24 @@ export function MyPtoClient({
               </label>
 
               {formError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  {formError}
-                </p>
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>
               )}
 
               <div className="flex gap-3 pt-1">
                 <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setFormError("");
-                  }}
+                  type="button" onClick={() => { setShowForm(false); setFormError(""); }}
                   className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={submitting}
+                  type="submit" disabled={submitting}
                   className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
                 >
                   {submitting ? "Submitting..." : "Submit request"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Rejection reason modal */}
-      {rejectingId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Reject request
-            </h2>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Reason{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              rows={3}
-              placeholder="Let the employee know why..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setRejectingId(null)}
-                className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleReject(rejectingId)}
-                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
-              >
-                Reject
-              </button>
-            </div>
           </div>
         </div>
       )}

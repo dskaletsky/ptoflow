@@ -12,6 +12,7 @@ interface SidebarProps {
     image?: string | null;
     role: UserRole;
   };
+  pendingCount: number;
 }
 
 const navItems = [
@@ -21,11 +22,12 @@ const navItems = [
 ];
 
 const adminItems = [
+  { href: "/requests", label: "Requests", icon: "🔔" },
   { href: "/my-team", label: "Employees", icon: "👤" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, pendingCount }: SidebarProps) {
   const pathname = usePathname();
 
   const isAdmin =
@@ -69,7 +71,8 @@ export function Sidebar({ user }: SidebarProps) {
               </p>
             </div>
             {adminItems.map((item) => {
-              const active = pathname === item.href;
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              const showBadge = item.href === "/requests" && pendingCount > 0;
               return (
                 <Link
                   key={item.href}
@@ -81,7 +84,12 @@ export function Sidebar({ user }: SidebarProps) {
                   }`}
                 >
                   <span>{item.icon}</span>
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {showBadge && (
+                    <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

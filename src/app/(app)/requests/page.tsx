@@ -1,0 +1,32 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { UserRole } from "@prisma/client";
+import { RequestsClient } from "./RequestsClient";
+
+export default async function RequestsPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/auth/signin");
+  if (session.user.role === UserRole.TEAM_MEMBER) redirect("/dashboard");
+
+  const orgId = session.user.organizationId!;
+
+  const pendingRequests = await prisma.leaveRequest.findMany({
+    where: {
+      status: "PENDING",
+      user: { organizationId: orgId },
+    },
+    include: {
+      category: true,
+      user: { select: { id: true, name: true, email: true, image: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return (
+    <RequestsClient
+      pendingRequests={JSON.parse(JSON.stringify(pendingRequests))}
+    />
+  );
+}
