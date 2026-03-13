@@ -68,14 +68,21 @@ export async function POST(req: NextRequest) {
   });
 
   if (overlapping) {
-    const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
-    const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
-      ? fmt(overlapping.startDate)
-      : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
-    return NextResponse.json(
-      { error: `${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.` },
-      { status: 422 }
-    );
+    // Only a real conflict if the overlapping period shares actual working days
+    const overlapStart = overlapping.startDate > start ? overlapping.startDate : start;
+    const overlapEnd = overlapping.endDate < end ? overlapping.endDate : end;
+    const sharedWorkingDays = countWorkingDays(overlapStart, overlapEnd, holidays.map((h) => h.date));
+
+    if (sharedWorkingDays > 0) {
+      const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
+      const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
+        ? fmt(overlapping.startDate)
+        : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
+      return NextResponse.json(
+        { error: `${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.` },
+        { status: 422 }
+      );
+    }
   }
 
   // Fetch category to determine approval requirement and bank limits
