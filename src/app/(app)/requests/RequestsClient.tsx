@@ -65,7 +65,7 @@ export function RequestsClient({ pendingRequests: initialRequests }: Props) {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Requests</h1>
         <p className="text-gray-500 mt-1 text-sm">
@@ -73,7 +73,7 @@ export function RequestsClient({ pendingRequests: initialRequests }: Props) {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {requests.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-2xl mb-3">🎉</p>
