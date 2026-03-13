@@ -56,30 +56,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Request contains no working days" }, { status: 400 });
   }
 
-  // Check for overlapping approved PTO
-  const overlapping = await prisma.leaveRequest.findFirst({
+  // Check for overlapping approved PTO — only on requests that have actual working days
+  // (guards against weekend-only approved requests causing false conflicts)
+  const approvedRequests = await prisma.leaveRequest.findMany({
     where: {
       userId: session.user.id,
       status: "APPROVED",
       startDate: { lte: end },
       endDate: { gte: start },
+      workingDaysCount: { gt: 0 },
     },
     include: { category: true },
   });
 
-  if (overlapping) {
-    // Only a real conflict if the overlapping period shares actual working days
-    const overlapStart = overlapping.startDate > start ? overlapping.startDate : start;
-    const overlapEnd = overlapping.endDate < end ? overlapping.endDate : end;
+  for (const existing of approvedRequests) {
+    const overlapStart = existing.startDate > start ? existing.startDate : start;
+    const overlapEnd = existing.endDate < end ? existing.endDate : end;
     const sharedWorkingDays = countWorkingDays(overlapStart, overlapEnd, holidays.map((h) => h.date));
 
     if (sharedWorkingDays > 0) {
       const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
-      const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
-        ? fmt(overlapping.startDate)
-        : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
+      const dateStr = existing.startDate.toDateString() === existing.endDate.toDateString()
+        ? fmt(existing.startDate)
+        : `${fmt(existing.startDate)} – ${fmt(existing.endDate)}`;
       return NextResponse.json(
-        { error: `${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.` },
+        { error: `${existing.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.` },
         { status: 422 }
       );
     }

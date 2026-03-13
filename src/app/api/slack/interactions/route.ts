@@ -266,28 +266,29 @@ async function processRequestSubmission({
     return dmError("Invalid leave category. Please try again.");
   }
 
-  // Check for overlapping approved PTO
-  const overlapping = await prisma.leaveRequest.findFirst({
+  // Check for overlapping approved PTO — only on requests that have actual working days
+  const approvedRequests = await prisma.leaveRequest.findMany({
     where: {
       userId: user.id,
       status: "APPROVED",
       startDate: { lte: end },
       endDate: { gte: start },
+      workingDaysCount: { gt: 0 },
     },
     include: { category: true },
   });
 
-  if (overlapping) {
-    const overlapStart = overlapping.startDate > start ? overlapping.startDate : start;
-    const overlapEnd = overlapping.endDate < end ? overlapping.endDate : end;
+  for (const existing of approvedRequests) {
+    const overlapStart = existing.startDate > start ? existing.startDate : start;
+    const overlapEnd = existing.endDate < end ? existing.endDate : end;
     const sharedWorkingDays = countWorkingDays(overlapStart, overlapEnd, holidays.map((h) => h.date));
 
     if (sharedWorkingDays > 0) {
       const fmt = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" });
-      const dateStr = overlapping.startDate.toDateString() === overlapping.endDate.toDateString()
-        ? fmt(overlapping.startDate)
-        : `${fmt(overlapping.startDate)} – ${fmt(overlapping.endDate)}`;
-      return dmError(`${overlapping.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.`);
+      const dateStr = existing.startDate.toDateString() === existing.endDate.toDateString()
+        ? fmt(existing.startDate)
+        : `${fmt(existing.startDate)} – ${fmt(existing.endDate)}`;
+      return dmError(`${existing.category.emoji} You already have approved PTO for that date. Existing approval: ${dateStr}.`);
     }
   }
 
