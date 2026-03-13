@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Category {
   id: string;
@@ -56,7 +56,8 @@ function formatDate(dateStr: string) {
 
 export function MyPtoClient({ categories, banks, myRequests: initialRequests }: Props) {
   const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
+  const searchParams = useSearchParams();
+  const [showForm, setShowForm] = useState(searchParams.get("new") === "1");
   const [myRequests, setMyRequests] = useState(initialRequests);
 
   // Form state

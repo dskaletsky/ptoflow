@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Suspense } from "react";
 import { MyPtoClient } from "./MyPtoClient";
 
 export default async function MyPtoPage() {
@@ -31,10 +32,12 @@ export default async function MyPtoPage() {
   ]);
 
   return (
-    <MyPtoClient
-      categories={JSON.parse(JSON.stringify(categories))}
-      banks={JSON.parse(JSON.stringify(banks))}
-      myRequests={JSON.parse(JSON.stringify(myRequests))}
-    />
+    <Suspense>
+      <MyPtoClient
+        categories={JSON.parse(JSON.stringify(categories))}
+        banks={JSON.parse(JSON.stringify(banks))}
+        myRequests={JSON.parse(JSON.stringify(myRequests))}
+      />
+    </Suspense>
   );
 }
