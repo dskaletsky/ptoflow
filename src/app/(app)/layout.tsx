@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { Sidebar } from "@/components/Sidebar";
+import { countPendingForApprover } from "@/lib/pendingRequests";
 
 export default async function AppLayout({
   children,
@@ -20,16 +20,13 @@ export default async function AppLayout({
     session.user.role === UserRole.ADMIN ||
     session.user.role === UserRole.MANAGER;
 
-  const isAdmin = session.user.role === UserRole.ADMIN;
-  const pendingUserFilter = isAdmin
-    ? { organizationId: session.user.organizationId }
-    : { organizationId: session.user.organizationId, managerId: session.user.id };
-
   const pendingCount =
     isManagerOrAdmin && session.user.organizationId
-      ? await prisma.leaveRequest.count({
-          where: { status: "PENDING", user: pendingUserFilter },
-        })
+      ? await countPendingForApprover(
+          session.user.id,
+          session.user.organizationId,
+          session.user.role
+        )
       : 0;
 
   return (

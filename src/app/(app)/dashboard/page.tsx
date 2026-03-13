@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import Link from "next/link";
 import { RequestPtoButton } from "@/components/RequestPtoButton";
+import { getPendingForApprover } from "@/lib/pendingRequests";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -67,22 +68,10 @@ export default async function DashboardPage() {
     take: 5,
   });
 
-  const isAdmin = session.user.role === UserRole.ADMIN;
-  const pendingUserFilter = isAdmin
-    ? { organizationId: orgId }
-    : { organizationId: orgId, managerId: userId };
-
   // Fetch pending requests (for manager/admin review)
   const pendingRequests =
     isManagerOrAdmin && orgId
-      ? await prisma.leaveRequest.findMany({
-          where: {
-            status: "PENDING",
-            user: pendingUserFilter,
-          },
-          include: { category: true, user: true },
-          orderBy: { createdAt: "asc" },
-        })
+      ? await getPendingForApprover(userId, orgId, session.user.role)
       : [];
 
   // Fetch team out of office today

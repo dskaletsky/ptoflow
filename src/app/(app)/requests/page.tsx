@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { RequestsClient } from "./RequestsClient";
+import { getPendingForApprover } from "@/lib/pendingRequests";
 
 export default async function RequestsPage() {
   const session = await getServerSession(authOptions);
@@ -12,23 +13,16 @@ export default async function RequestsPage() {
 
   const orgId = session.user.organizationId!;
   const isAdmin = session.user.role === UserRole.ADMIN;
-  const userFilter = isAdmin
+  const previousUserFilter = isAdmin
     ? { organizationId: orgId }
     : { organizationId: orgId, managerId: session.user.id };
 
   const [pendingRequests, previousRequests] = await Promise.all([
-    prisma.leaveRequest.findMany({
-      where: { status: "PENDING", user: userFilter },
-      include: {
-        category: true,
-        user: { select: { id: true, name: true, email: true, image: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    }),
+    getPendingForApprover(session.user.id, orgId, session.user.role),
     prisma.leaveRequest.findMany({
       where: {
         status: { in: ["APPROVED", "REJECTED", "CANCELLED"] },
-        user: userFilter,
+        user: previousUserFilter,
       },
       include: {
         category: true,
