@@ -11,13 +11,14 @@ export default async function RequestsPage() {
   if (session.user.role === UserRole.TEAM_MEMBER) redirect("/dashboard");
 
   const orgId = session.user.organizationId!;
+  const isAdmin = session.user.role === UserRole.ADMIN;
+  const userFilter = isAdmin
+    ? { organizationId: orgId }
+    : { organizationId: orgId, managerId: session.user.id };
 
   const [pendingRequests, previousRequests] = await Promise.all([
     prisma.leaveRequest.findMany({
-      where: {
-        status: "PENDING",
-        user: { organizationId: orgId },
-      },
+      where: { status: "PENDING", user: userFilter },
       include: {
         category: true,
         user: { select: { id: true, name: true, email: true, image: true } },
@@ -27,7 +28,7 @@ export default async function RequestsPage() {
     prisma.leaveRequest.findMany({
       where: {
         status: { in: ["APPROVED", "REJECTED", "CANCELLED"] },
-        user: { organizationId: orgId },
+        user: userFilter,
       },
       include: {
         category: true,

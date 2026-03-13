@@ -67,13 +67,18 @@ export default async function DashboardPage() {
     take: 5,
   });
 
+  const isAdmin = session.user.role === UserRole.ADMIN;
+  const pendingUserFilter = isAdmin
+    ? { organizationId: orgId }
+    : { organizationId: orgId, managerId: userId };
+
   // Fetch pending requests (for manager/admin review)
   const pendingRequests =
     isManagerOrAdmin && orgId
       ? await prisma.leaveRequest.findMany({
           where: {
             status: "PENDING",
-            user: { organizationId: orgId },
+            user: pendingUserFilter,
           },
           include: { category: true, user: true },
           orderBy: { createdAt: "asc" },
