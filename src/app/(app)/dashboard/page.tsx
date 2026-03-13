@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import Link from "next/link";
+import { RequestPtoButton } from "@/components/RequestPtoButton";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -42,13 +43,21 @@ export default async function DashboardPage() {
     session.user.role === UserRole.ADMIN ||
     session.user.role === UserRole.MANAGER;
 
-  // Fetch leave banks
-  const banks = orgId
-    ? await prisma.leaveBank.findMany({
-        where: { userId, year },
-        include: { category: true },
-      })
-    : [];
+  // Fetch leave banks and categories
+  const [banks, categories] = await Promise.all([
+    orgId
+      ? prisma.leaveBank.findMany({
+          where: { userId, year },
+          include: { category: true },
+        })
+      : [],
+    orgId
+      ? prisma.leaveCategory.findMany({
+          where: { organizationId: orgId, isActive: true },
+          orderBy: { name: "asc" },
+        })
+      : [],
+  ]);
 
   // Fetch upcoming approved requests
   const upcomingRequests = await prisma.leaveRequest.findMany({
@@ -96,12 +105,10 @@ export default async function DashboardPage() {
             Here's what's happening with your team's time off.
           </p>
         </div>
-        <Link
-          href="/my-pto?new=1"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Request PTO
-        </Link>
+        <RequestPtoButton
+          categories={JSON.parse(JSON.stringify(categories))}
+          banks={JSON.parse(JSON.stringify(banks))}
+        />
       </div>
 
       {/* Bank balances */}
