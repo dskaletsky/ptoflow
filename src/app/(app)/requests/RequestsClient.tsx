@@ -14,14 +14,23 @@ interface LeaveRequest {
   startDate: string;
   endDate: string;
   workingDaysCount: number;
+  status: string;
   description: string | null;
+  rejectionReason: string | null;
   category: Category;
   user: { id: string; name: string | null; email: string | null; image: string | null };
 }
 
 interface Props {
   pendingRequests: LeaveRequest[];
+  previousRequests: LeaveRequest[];
 }
+
+const statusStyles: Record<string, string> = {
+  APPROVED: "bg-green-50 text-green-700 border border-green-200",
+  REJECTED: "bg-red-50 text-red-700 border border-red-200",
+  CANCELLED: "bg-gray-100 text-gray-500 border border-gray-200",
+};
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -32,7 +41,7 @@ function formatDate(dateStr: string) {
   });
 }
 
-export function RequestsClient({ pendingRequests: initialRequests }: Props) {
+export function RequestsClient({ pendingRequests: initialRequests, previousRequests }: Props) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -144,6 +153,74 @@ export function RequestsClient({ pendingRequests: initialRequests }: Props) {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Previous requests */}
+      <div className="mt-10">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Previous Requests</h2>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          {previousRequests.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-sm">No request history yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Employee</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Type</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Dates</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Days</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previousRequests.map((req) => (
+                  <tr key={req.id} className="border-b border-gray-50 last:border-0">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        {req.user.image ? (
+                          <img src={req.user.image} className="w-7 h-7 rounded-full" alt="" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
+                            {req.user.name?.[0] ?? "?"}
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-800 whitespace-nowrap">
+                          {req.user.name ?? req.user.email}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <span>{req.category.emoji}</span>
+                        <span className="text-gray-700 whitespace-nowrap">{req.category.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
+                      {formatDate(req.startDate)} – {formatDate(req.endDate)}
+                    </td>
+                    <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
+                      {req.workingDaysCount}d
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[req.status]}`}>
+                        {req.status.charAt(0) + req.status.slice(1).toLowerCase()}
+                      </span>
+                      {req.status === "REJECTED" && req.rejectionReason && (
+                        <p className="text-xs text-gray-400 mt-0.5">{req.rejectionReason}</p>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-gray-500 max-w-xs truncate">
+                      {req.description ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       {/* Rejection reason modal */}

@@ -12,21 +12,36 @@ export default async function RequestsPage() {
 
   const orgId = session.user.organizationId!;
 
-  const pendingRequests = await prisma.leaveRequest.findMany({
-    where: {
-      status: "PENDING",
-      user: { organizationId: orgId },
-    },
-    include: {
-      category: true,
-      user: { select: { id: true, name: true, email: true, image: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [pendingRequests, previousRequests] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: {
+        status: "PENDING",
+        user: { organizationId: orgId },
+      },
+      include: {
+        category: true,
+        user: { select: { id: true, name: true, email: true, image: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.leaveRequest.findMany({
+      where: {
+        status: { in: ["APPROVED", "REJECTED", "CANCELLED"] },
+        user: { organizationId: orgId },
+      },
+      include: {
+        category: true,
+        user: { select: { id: true, name: true, email: true, image: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
 
   return (
     <RequestsClient
       pendingRequests={JSON.parse(JSON.stringify(pendingRequests))}
+      previousRequests={JSON.parse(JSON.stringify(previousRequests))}
     />
   );
 }
