@@ -101,7 +101,7 @@ export function PtoCalendar({ requests, holidays, onApprove, onReject, onCancel 
   const today = new Date();
   const todayStr = toDateStr(today);
 
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">("list");
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
